@@ -3,7 +3,7 @@ const canvas=$("game"), ctx=canvas.getContext("2d");
 let ws=null, reconnectTimer=null;
 let screen="menu", started=false, mapName="Garden", W=3000,H=1800, roomCode="";
 let me={id:null,name:"Player",x:500,y:500,a:0,hp:100,ink:100,special:0,score:0,team:"cyan",weapon:"splatter",alive:true};
-let players=new Map(), ink=[], keys={}, effects=[], lastState=0,lastShot=0;
+let players=new Map(), ink=[], keys={}, effects=[], lastState=0,lastShot=0, lastFrame=performance.now();
 const colors={cyan:"#24d8ff",magenta:"#ff4d83"};
 const maps={Garden:["#b8d9a8","#a6c895","#35464a"],Factory:["#b7b7b7","#a0a0a0","#343b42"],"Night City":["#141b30","#202947","#38415f"]};
 
@@ -70,8 +70,17 @@ function connect(){
   };
 }
 function sync(arr){
-  players=new Map(arr.map(p=>[p.id,p]));
-  const p=players.get(me.id);if(p)me={...me,...p};
+  const next=new Map();
+  for(const p of arr){
+    const old=players.get(p.id);
+    next.set(p.id,{...p,rx:old?.rx??p.x,ry:old?.ry??p.y,ra:old?.ra??p.a});
+  }
+  players=next;
+  const p=players.get(me.id);
+  if(p){
+    me.hp=p.hp;me.ink=p.ink;me.special=p.special;me.score=p.score;me.team=p.team;me.alive=p.alive;
+    // Do not overwrite local x/y/a every network tick: that causes visible rubber-banding.
+  }
 }
 function drawRooms(arr){
   const list=$("roomList");
@@ -111,11 +120,9 @@ addEventListener("keydown",e=>{
   if(e.code==="Space")send({type:"special"});
 });
 addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
-addEventListener("mousemove",e=>{me.a=Math.atan2(e.clientY-innerHeight/2,e.clientX-innerWidth/2)});
-addEventListener("mousedown",e=>{
-  if(e.button===0)shoot();
-  if(e.button===2)paint();
-});
+addEventListener("mousemove",e=>{ if(document.pointerLockElement===canvas){ me.a+=e.movementX*0.004; } });
+addEventListener("mousedown",e=>{ if(e.button===0)shoot(); if(e.button===2)paint(); });
+canvas.addEventListener("click",()=>{ if(started && document.pointerLockElement!==canvas) canvas.requestPointerLock?.(); });
 addEventListener("contextmenu",e=>e.preventDefault());
 
 function shoot(){
@@ -132,15 +139,30 @@ function paint(){
   for(let d=50;d<360;d+=65)ink.push({x:me.x+dx*d+(Math.random()-.5)*30,y:me.y+dy*d+(Math.random()-.5)*30,r:30+Math.random()*25,team:me.team,t:Date.now()});
   send({type:"paint",x:me.x+dx*170,y:me.y+dy*170,r:75,cost:7,special:4});
 }
+const obstacles=Array.from({length:15},(_,i)=>({x:180+(i*379)%2550,y:150+(i*613)%1400,w:180+(i%3)*70,h:70+(i%2)*70}));
+function blocked(x,y,r=28){
+  if(x-r<0||y-r<0||x+r>W||y+r>H)return true;
+  return obstacles.some(o=>x+r>o.x&&x-r<o.x+o.w&&y+r>o.y&&y-r<o.y+o.h);
+}
+function tryMove(dx,dy){
+  const r=28;
+  const nx=me.x+dx, ny=me.y+dy;
+  if(!blocked(nx,me.y,r))me.x=nx;
+  if(!blocked(me.x,ny,r))me.y=ny;
+}
 function update(){
   if(!started)return;
+  const now=performance.now(), dt=Math.min(.033,(now-lastFrame)/1000); lastFrame=now;
   let dx=(keys.w||keys.arrowup?1:0)-(keys.s||keys.arrowdown?1:0);
   let dy=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0);
-  if(dx||dy){const l=Math.hypot(dx,dy);me.x+=dx/l*6;me.y+=dy/l*6}
-  me.x=Math.max(30,Math.min(W-30,me.x));me.y=Math.max(30,Math.min(H-30,me.y));
+  if(dx||dy){const l=Math.hypot(dx,dy);const speed=360;tryMove(dx/l*speed*dt,dy/l*speed*dt)}
   if(performance.now()-lastState>50){
     lastState=performance.now();
     send({type:"state",x:me.x,y:me.y,a:me.a,hp:me.hp,ink:me.ink,weapon:me.weapon});
+  }
+  for(const p of players.values()){
+    if(p.id===me.id)continue;
+    p.rx+=(p.x-p.rx)*Math.min(1,dt*14); p.ry+=(p.y-p.ry)*Math.min(1,dt*14); p.ra+=(p.a-p.ra)*Math.min(1,dt*14);
   }
   $("hp").textContent=Math.round(me.hp);$("ink").textContent=Math.round(me.ink);$("sp").textContent=Math.round(me.special);$("score").textContent=me.score;$("weapon").textContent=me.weapon.toUpperCase();
 }
@@ -152,14 +174,15 @@ function draw(){
   ctx.strokeStyle=mm[1];ctx.lineWidth=2;
   for(let i=0;i<W;i+=90){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,H);ctx.stroke()}
   for(let j=0;j<H;j+=90){ctx.beginPath();ctx.moveTo(0,j);ctx.lineTo(W,j);ctx.stroke()}
-  for(let i=0;i<15;i++){const ox=180+(i*379)%2550,oy=150+(i*613)%1400;ctx.fillStyle=mm[2];ctx.fillRect(ox,oy,180+(i%3)*70,70+(i%2)*70)}
+  for(const o of obstacles){ctx.fillStyle=mm[2];ctx.fillRect(o.x,o.y,o.w,o.h)}
   ink.forEach(s=>{ctx.globalAlpha=.48;ctx.fillStyle=colors[s.team]||"#fff";ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill()});ctx.globalAlpha=1;
   for(const p of players.values()){
     if(!p.alive)continue;
-    ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.a);
+    const px=p.id===me.id?me.x:p.rx, py=p.id===me.id?me.y:p.ry, pa=p.id===me.id?me.a:p.ra;
+    ctx.save();ctx.translate(px,py);ctx.rotate(pa);
     ctx.fillStyle=colors[p.team]||"#fff";ctx.beginPath();ctx.arc(0,0,29,0,Math.PI*2);ctx.fill();
     ctx.fillStyle="#222";ctx.fillRect(17,-7,38,14);ctx.restore();
-    ctx.fillStyle="#111";ctx.font="bold 13px Arial";ctx.textAlign="center";ctx.fillText(p.name,p.x,p.y-40);
+    ctx.fillStyle="#111";ctx.font="bold 13px Arial";ctx.textAlign="center";ctx.fillText(p.name,px,py-40);
   }
   ctx.restore();
 }

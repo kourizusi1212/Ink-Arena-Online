@@ -62,11 +62,29 @@ if (!rooms.has("1000")) {
   });
 }
 
-function spawn(team) {
-  return {
-    x: team === "cyan" ? 350 + Math.random()*650 : WORLD.w - 1000 + Math.random()*650,
-    y: 250 + Math.random()*(WORLD.h-500)
-  };
+
+const OBSTACLES = Array.from({length:15},(_,i)=>({x:180+(i*379)%2550,y:150+(i*613)%1400,w:180+(i%3)*70,h:70+(i%2)*70}));
+function blocked(x,y,r=28){
+  if(x-r<0||y-r<0||x+r>WORLD.w||y+r>WORLD.h)return true;
+  return OBSTACLES.some(o=>x+r>o.x&&x-r<o.x+o.w&&y+r>o.y&&y-r<o.y+o.h);
+}
+function spawn(team){
+  for(let i=0;i<100;i++){
+    const x=team === "cyan" ? 350 + Math.random()*650 : WORLD.w - 1000 + Math.random()*650;
+    const y=250 + Math.random()*(WORLD.h-500);
+    if(!blocked(x,y,32)) return {x,y};
+  }
+  return team === "cyan" ? {x:70,y:70} : {x:WORLD.w-70,y:WORLD.h-70};
+}
+function applyPosition(p,x,y){
+  x=Number(x);y=Number(y);
+  if(!Number.isFinite(x)||!Number.isFinite(y))return;
+  const maxStep=48;
+  let dx=Math.max(-maxStep,Math.min(maxStep,x-p.x));
+  let dy=Math.max(-maxStep,Math.min(maxStep,y-p.y));
+  const nx=p.x+dx, ny=p.y+dy;
+  if(!blocked(nx,p.y,28))p.x=nx;
+  if(!blocked(p.x,ny,28))p.y=ny;
 }
 function assignTeam(room) {
   if (room.mode === "solo") return room.players.size % 2 ? "magenta" : "cyan";
@@ -183,8 +201,7 @@ wss.on("connection", ws => {
 
     if (type === "state") {
       if (!room.started || !p.alive) return;
-      p.x=Math.max(30,Math.min(WORLD.w-30,Number(m.x)||p.x));
-      p.y=Math.max(30,Math.min(WORLD.h-30,Number(m.y)||p.y));
+      applyPosition(p,m.x,m.y);
       p.a=Number.isFinite(Number(m.a)) ? Number(m.a) : p.a;
       if (weapons[m.weapon]) p.weapon=m.weapon;
       return;
