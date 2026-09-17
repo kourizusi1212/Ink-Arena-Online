@@ -1,38 +1,31 @@
-# INK ARENA ONLINE — FULL
+# INK ARENA ONLINE - LOBBY FIXED
 
-スプラトゥーンから着想を得た、独自タイトルのオンライン・インクバトルです。
-元作品の画像・音声・キャラクターは使用していません。
+## Render
+GitHubリポジトリのルートに次の構成で置いてください。
 
-## 追加したもの
-- オンラインWebSocket対戦
-- ロビー／部屋一覧
-- 部屋作成・参加
-- 4vs4チーム戦／個人戦の選択UI
-- 3ステージ選択
-- インクを塗るシステム
-- 3種類の武器（SPLATTER / ROLLER / CHARGER）
-- スペシャル技
-- KO・リスポーン
-- 3分タイマー
-- リザルト画面
-- チームカラーとメンバー表示
-- スコア表示
-- PC向けWASD・矢印・マウス操作
+server.js
+package.json
+public/index.html
+public/game.js
+public/style.css
 
-## 起動
-Node.js 18+ が必要です。
+Renderの **Root Directory は空欄** にしてください。
 
-```bash
+Build Command:
 npm install
+
+Start Command:
 npm start
-```
 
-ブラウザで http://localhost:3000 を開きます。
+環境変数 PORT は設定不要です。Renderが割り当てたPORTを自動使用します。
 
-## 操作
-WASD / 矢印：移動
-マウス：照準
-左クリック：射撃
-右クリック：インクを塗る
-1 / 2 / 3：武器切り替え
-Space：スペシャル（SP 100%）
+## 修正内容
+- 部屋作成をサーバー側で確実に処理
+- 部屋一覧の更新ボタンを追加
+- Quick Match用の部屋を常設
+- 部屋参加時の「存在しない・満員・試合中」を明確に表示
+- WebSocket切断時に自動再接続
+- ロビーからバトル開始できるように状態を整理
+- リザルトからロビーへ戻れる
+- 「もう一度バトル」で同じ部屋を再開
+- RenderのRoot Directoryに依存しない構成
