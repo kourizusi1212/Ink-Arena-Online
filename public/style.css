@@ -1,3 +1,4 @@
+[hidden]{display:none!important}
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101820;color:#fff;font-family:Arial,"Noto Sans JP",sans-serif}
 canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
 .screen{position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.34);z-index:10}
@@ -14,3 +15,5 @@ button{cursor:pointer;font-weight:800;background:#176a91}button:hover{filter:bri
 #cross:before,#cross:after{content:"";position:absolute;background:#fff;box-shadow:0 0 5px #000}.crosshair{}
 #cross:before{width:24px;height:2px;top:11px;left:0}#cross:after{height:24px;width:2px;left:11px;top:0}
 @media(max-width:600px){.panel{padding:20px}h1{font-size:32px}.bottom{font-size:12px;gap:7px}.top{font-size:14px;padding:12px}}
+
+.screen[hidden],#hud[hidden],#cross[hidden]{display:none!important}

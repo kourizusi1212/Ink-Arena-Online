@@ -8,6 +8,14 @@ const colors={cyan:"#24d8ff",magenta:"#ff4d83"};
 const maps={Garden:["#b8d9a8","#a6c895","#35464a"],Factory:["#b7b7b7","#a0a0a0","#343b42"],"Night City":["#141b30","#202947","#38415f"]};
 
 function setStatus(s){$("status").textContent=s}
+function setView(view){
+  screen=view;
+  $("menu").hidden=view!=="menu";
+  $("lobby").hidden=view!=="lobby";
+  $("hud").hidden=view!=="game";
+  $("result").hidden=view!=="result";
+  $("cross").hidden=view!=="game";
+}
 function send(o){if(ws&&ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify(o))}
 function playerName(){return ($("player").value.trim()||"Player").slice(0,16)}
 
@@ -32,15 +40,15 @@ function connect(){
     if(m.type==="error"){setStatus("⚠ "+m.msg);return}
     if(m.type==="joined"){
       me.id=m.id; roomCode=m.code; mapName=m.map||"Garden"; W=m.world.w;H=m.world.h;
-      screen="lobby";started=false;
-      $("menu").hidden=true;$("result").hidden=true;$("hud").hidden=true;$("lobby").hidden=false;
+      started=false;
+      setView("lobby");
       $("roomTitle").textContent=`ROOM #${roomCode} — ${mapName}`;
       $("lobbyStatus").textContent="参加者を待っています";
       send({type:"rooms"});
     }
     if(m.type==="players"){sync(m.players||[]);drawMembers()}
     if(m.type==="start"){
-      started=true;screen="game";$("lobby").hidden=true;$("result").hidden=true;$("hud").hidden=false;
+      started=true;setView("game");
       sync(m.players||[]);$("time").textContent=fmt(m.time??180);
     }
     if(m.type==="tick"||m.type==="state"){
@@ -49,14 +57,14 @@ function connect(){
       if(m.time!=null)$("time").textContent=fmt(m.time);
     }
     if(m.type==="result"){
-      started=false;screen="result";$("hud").hidden=true;$("lobby").hidden=true;showResult(m.players||[]);
+      started=false;setView("result");showResult(m.players||[]);
     }
     if(m.type==="respawn"){const p=players.get(m.id);if(p)p.alive=true}
     if(m.type==="ko")effects.push({type:"ko",t:35})
     if(m.type==="special")effects.push({type:"special",x:m.x,y:m.y,t:30})
     if(m.type==="left"){
-      started=false;screen="menu";roomCode="";
-      $("lobby").hidden=true;$("result").hidden=true;$("hud").hidden=true;$("menu").hidden=false;
+      started=false;roomCode="";
+      setView("menu");
       setStatus("部屋から退出しました");send({type:"rooms"});
     }
   };
@@ -91,7 +99,7 @@ $("quickBtn").onclick=()=>send({type:"join",code:"1000",player:playerName()});
 $("createBtn").onclick=()=>send({type:"create",name:$("roomName").value,map:$("map").value,mode:$("mode").value,player:playerName()});
 $("startBtn").onclick=()=>send({type:"start"});
 $("backBtn").onclick=()=>send({type:"leave"});
-$("again").onclick=()=>{screen="lobby";$("result").hidden=true;$("lobby").hidden=false;$("hud").hidden=true;$("lobbyStatus").textContent="ロビーに戻りました";drawMembers()};
+$("again").onclick=()=>{started=false;setView("lobby");$("lobbyStatus").textContent="ロビーに戻りました";send({type:"rooms"});drawMembers()};
 $("rematch").onclick=()=>send({type:"restart"});
 
 addEventListener("keydown",e=>{
@@ -164,4 +172,5 @@ function showResult(arr){
 function resize(){canvas.width=innerWidth*devicePixelRatio;canvas.height=innerHeight*devicePixelRatio;canvas.style.width=innerWidth+"px";canvas.style.height=innerHeight+"px";ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0)}
 addEventListener("resize",resize);resize();
 function loop(){update();draw();requestAnimationFrame(loop)}
+setView("menu");
 connect();loop();
